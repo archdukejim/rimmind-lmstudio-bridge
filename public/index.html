@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RimMind LLM Bridge</title>
+  <!-- Google Fonts: Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Styles -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Ambient background glow elements -->
+  <div class="glow glow-1"></div>
+  <div class="glow glow-2"></div>
+
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="logo-group">
+        <span class="logo-icon">🧠</span>
+        <div class="logo-text">
+          <h1>RIMMIND</h1>
+          <span class="subtitle">LM STUDIO BRIDGE</span>
+        </div>
+      </div>
+      <div class="connection-status-bar">
+        <div class="status-pill status-bridge-ok">
+          <span class="status-dot"></span>
+          Bridge: <span id="lbl-bridge-port">3000</span>
+        </div>
+        <div class="status-pill" id="pill-lm-status">
+          <span class="status-dot"></span>
+          LM Studio: <span id="lbl-lm-status">Checking...</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Grid Layout -->
+    <div class="dashboard-grid">
+      
+      <!-- Left Column: Controls & Configuration -->
+      <aside class="sidebar-panel">
+        
+        <!-- Connectivity & Controls -->
+        <section class="card config-card">
+          <h2 class="card-title">Bridge Configuration</h2>
+          <form id="config-form" class="config-form">
+            <div class="input-group">
+              <label for="input-port">Bridge Port</label>
+              <input type="number" id="input-port" name="port" min="1024" max="65535" required>
+            </div>
+            
+            <div class="input-group">
+              <label for="input-url">LM Studio Base URL</label>
+              <input type="url" id="input-url" name="lmStudioUrl" placeholder="http://127.0.0.1:1234" required>
+            </div>
+
+            <div class="input-group">
+              <label for="input-bridge-key">Bridge API Key <span class="hint">(paste this into RimMind settings)</span></label>
+              <input type="text" id="input-bridge-key" name="bridgeApiKey" placeholder="rimmind-bridge">
+            </div>
+
+            <div class="input-group">
+              <label for="input-lm-key">LM Studio API Key <span class="hint">(only if LM Studio auth is on)</span></label>
+              <input type="password" id="input-lm-key" name="lmStudioApiKey" placeholder="Leave blank for no-auth setups">
+            </div>
+
+            <div class="toggle-group">
+              <label class="switch-container">
+                <input type="checkbox" id="chk-auto-map" name="autoMapModel">
+                <span class="switch-slider"></span>
+              </label>
+              <div class="toggle-label">
+                <span class="title">Auto-Model Mapping</span>
+                <span class="description">Map any requested model to loaded local model</span>
+              </div>
+            </div>
+
+            <div class="toggle-group">
+              <label class="switch-container">
+                <input type="checkbox" id="chk-sanitize" name="sanitizeResponse">
+                <span class="switch-slider"></span>
+              </label>
+              <div class="toggle-label">
+                <span class="title">Sanitize Responses</span>
+                <span class="description">Strip markdown formatting & json wrappers</span>
+              </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary" id="btn-save-config">
+              <span>Save Configuration</span>
+            </button>
+          </form>
+        </section>
+
+        <!-- RimWorld Integration Panel -->
+        <section class="card rimworld-card">
+          <div class="card-header">
+            <h2 class="card-title">RimWorld Link</h2>
+            <div class="status-badge" id="badge-rimworld-status">Checking...</div>
+          </div>
+          <div class="rimworld-details">
+            <div class="detail-row">
+              <span class="label">Config XML:</span>
+              <span class="value value-monospace" id="lbl-xml-file">Searching...</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">API Endpoint:</span>
+              <span class="value value-monospace" id="lbl-xml-endpoint">-</span>
+            </div>
+            <div class="detail-row">
+              <span class="label">API Key:</span>
+              <span class="value value-monospace" id="lbl-xml-key">-</span>
+            </div>
+            <button class="btn btn-accent btn-full" id="btn-link-rimworld" style="margin-top: 1rem; width: 100%;">
+              <span>Auto-Configure Settings</span>
+            </button>
+          </div>
+        </section>
+
+        <!-- Active Models Panel -->
+        <section class="card models-card">
+          <div class="card-header">
+            <h2 class="card-title">Active Models</h2>
+            <button class="btn btn-icon" id="btn-refresh-models" title="Refresh Models">🔄</button>
+          </div>
+          <div id="models-list" class="models-list">
+            <div class="empty-state">No models loaded. Load one in LM Studio.</div>
+          </div>
+        </section>
+
+        <!-- Queue Status Panel -->
+        <section class="card queue-card">
+          <h2 class="card-title">Request Queue</h2>
+          <div class="queue-status-wrapper">
+            <div class="queue-metric">
+              <span class="label">Queued Requests</span>
+              <span class="value" id="lbl-queue-size">0</span>
+            </div>
+            <div class="queue-metric">
+              <span class="label">Queue Processor</span>
+              <span class="value status-inactive" id="lbl-queue-processor">Idle</span>
+            </div>
+          </div>
+          <div class="progress-bar-container">
+            <div class="progress-bar-fill" id="progress-queue"></div>
+          </div>
+        </section>
+
+      </aside>
+
+      <!-- Center/Right Column: Live Stream & Playground -->
+      <main class="main-content">
+        
+        <!-- Live Log Stream -->
+        <section class="card logs-card">
+          <div class="card-header">
+            <div class="header-left">
+              <span class="live-indicator">LIVE</span>
+              <h2 class="card-title">Activity Logs</h2>
+            </div>
+            <button class="btn btn-secondary btn-sm" id="btn-clear-logs">Clear Logs</button>
+          </div>
+          
+          <div class="logs-container" id="logs-container">
+            <div class="log-placeholder">Waiting for activity from RimWorld...</div>
+          </div>
+        </section>
+
+        <!-- Playground Panel -->
+        <section class="card playground-card">
+          <h2 class="card-title">Playground / Connection Test</h2>
+          <div class="playground-layout">
+            <div class="input-group">
+              <label for="txt-playground-prompt">Prompt Text</label>
+              <textarea id="txt-playground-prompt" rows="3" placeholder="Explain RimWorld component structures..."></textarea>
+            </div>
+            <div class="playground-actions">
+              <button class="btn btn-secondary" id="btn-test-ping">Ping LM Studio</button>
+              <button class="btn btn-accent" id="btn-submit-test">
+                <span class="btn-text">Test Model Call</span>
+                <span class="spinner" id="spinner-test"></span>
+              </button>
+            </div>
+            <div class="playground-output-container" id="playground-result-box" style="display: none;">
+              <label>Response</label>
+              <pre class="code-box" id="playground-output"></pre>
+            </div>
+          </div>
+        </section>
+
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Detail Dialog / Modal -->
+  <div class="modal-overlay" id="log-detail-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Log Details</h3>
+        <button class="modal-close" id="btn-close-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="detail-row">
+          <span class="label">Time</span>
+          <span class="value" id="detail-time"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Type</span>
+          <span class="value pill" id="detail-type"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Duration</span>
+          <span class="value" id="detail-duration"></span>
+        </div>
+        <div class="detail-row">
+          <span class="label">Tokens</span>
+          <span class="value" id="detail-tokens"></span>
+        </div>
+        <div class="code-wrapper">
+          <label>Payload details</label>
+          <pre id="detail-code" class="code-box"></pre>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
